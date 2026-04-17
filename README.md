@@ -2,6 +2,9 @@
 
 A premium, high-performance bookmark manager built for developers and power users. Featuring a "HeyHomie" inspired light-mode aesthetic, real-time synchronization, and secure private collections.
 
+> [!TIP]
+> **View the [Technical Architecture & Data Flow](architecture.md)** for a visual deep dive into the system!
+
 ## 🔐 Database Security & Auth
 
 ### Supabase Auth
