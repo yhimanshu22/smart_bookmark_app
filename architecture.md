@@ -74,7 +74,9 @@ graph LR
     Realtime -- Broadcast --> UserA_Tab2[User A - Tab 2]
     Realtime -- Broadcast --> UserA_Tab3[User A - Tab 3]
     
-    Note over Realtime: Filtered by user_id
+    subgraph Privacy ["Secure Filtering"]
+        Realtime -.-> Filter((Filtered by user_id))
+    end
 ```
 
 ## 🛠️ Tech Stack Breakdown
