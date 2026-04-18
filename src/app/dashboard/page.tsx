@@ -42,11 +42,16 @@ export default function DashboardPage() {
   }, [supabase]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      console.log('Realtime: Waiting for user...');
+      return;
+    }
+
+    console.log('Realtime: Initializing subscription for user:', user.id);
 
     // Supabase Realtime Subscription
     const channel = supabase
-      .channel('realtime:bookmarks')
+      .channel('db-changes')
       .on(
         'postgres_changes',
         {
@@ -56,7 +61,7 @@ export default function DashboardPage() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Realtime bookmark change received:', payload);
+          console.log('Realtime: Bookmark change received!', payload);
           if (payload.eventType === 'INSERT') {
             setBookmarks((prev) => {
               if (prev.find((b) => b.id === payload.new.id)) return prev;
@@ -71,13 +76,16 @@ export default function DashboardPage() {
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
+        console.log('Realtime: Subscription status changed:', status);
+        if (err) console.error('Realtime: Subscription error:', err);
         if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime channel error. Check if Realtime is enabled in Supabase API settings.');
+          console.error('Realtime: Channel error occurred.');
         }
       });
 
     return () => {
+      console.log('Realtime: Cleaning up subscription');
       supabase.removeChannel(channel);
     };
   }, [user, supabase]);
