@@ -60,24 +60,7 @@ sequenceDiagram
     end
     App-->>User: Display Bookmarks
 ```
-
 ---
-
-## 🔥 Real-time Data Flow
-
-The real-time synchronization uses PostgreSQL's replication log (via Supabase Realtime) to push changes to connected clients.
-
-```mermaid
-graph LR
-    UserA[User A] -- Add/Delete --> DB[(PostgreSQL)]
-    DB -- Change Event --> Realtime[Supabase Realtime]
-    Realtime -- Broadcast --> UserA_Tab2[User A - Tab 2]
-    Realtime -- Broadcast --> UserA_Tab3[User A - Tab 3]
-    
-    subgraph Privacy ["Secure Filtering"]
-        Realtime -.-> Filter((Filtered by user_id))
-    end
-```
 
 ## 🛠️ Tech Stack Breakdown
 
