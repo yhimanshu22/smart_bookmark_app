@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/client';
 import { X } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import type { Bookmark } from '@/types';
 
 export function AddBookmarkModal({
   isOpen,
@@ -12,7 +13,7 @@ export function AddBookmarkModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (bookmark: Bookmark) => void;
   userId: string;
 }) {
   const [url, setUrl] = useState('');
@@ -54,18 +55,22 @@ export function AddBookmarkModal({
     setIsSubmitting(true);
     const supabase = createClient();
     
-    const { error: insertError } = await supabase.from('bookmarks').insert({
-      user_id: userId,
-      title: title.trim(),
-      url: formattedUrl,
-    });
+    const { data: newBookmark, error: insertError } = await supabase
+      .from('bookmarks')
+      .insert({
+        user_id: userId,
+        title: title.trim(),
+        url: formattedUrl,
+      })
+      .select()
+      .single();
 
     setIsSubmitting(false);
 
     if (insertError) {
       setError(insertError.message);
-    } else {
-      onSuccess();
+    } else if (newBookmark) {
+      onSuccess(newBookmark as Bookmark);
       onClose();
     }
   };

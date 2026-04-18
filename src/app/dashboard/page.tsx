@@ -6,6 +6,7 @@ import type { Bookmark } from '@/types';
 import { Header } from '@/components/Header';
 import { BookmarkCard } from '@/components/BookmarkCard';
 import { AddBookmarkModal } from '@/components/AddBookmarkModal';
+import { DeleteConfirmationModal } from '@/components/DeleteConfirmationModal';
 import { Toast, ToastType } from '@/components/Toast';
 import { Plus, Search, Loader2 } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
@@ -17,6 +18,8 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [bookmarkToDelete, setBookmarkToDelete] = useState<Bookmark | null>(null);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   useEffect(() => {
@@ -32,7 +35,7 @@ export default function DashboardPage() {
           .order('created_at', { ascending: false });
         
         if (data) {
-          setBookmarks(data);
+          setBookmarksUniq(data);
         }
       }
       setIsLoading(false);
@@ -40,6 +43,19 @@ export default function DashboardPage() {
 
     fetchUserAndBookmarks();
   }, [supabase]);
+
+  // Helper to ensure bookmarks list is unique by id
+  const setBookmarksUniq = (newList: Bookmark[] | ((prev: Bookmark[]) => Bookmark[])) => {
+    setBookmarks((prev) => {
+      const updated = typeof newList === 'function' ? newList(prev) : newList;
+      const seen = new Set();
+      return updated.filter((b) => {
+        if (seen.has(b.id)) return false;
+        seen.add(b.id);
+        return true;
+      });
+    });
+  };
 
   useEffect(() => {
     if (!user) {
@@ -49,9 +65,9 @@ export default function DashboardPage() {
 
     console.log('Realtime: Initializing subscription for user:', user.id);
 
-    // Supabase Realtime Subscription
+    // Use a unique channel name per user to avoid overlaps
     const channel = supabase
-      .channel('db-changes')
+      .channel(`db-changes-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -63,10 +79,7 @@ export default function DashboardPage() {
         (payload) => {
           console.log('Realtime: Bookmark change received!', payload);
           if (payload.eventType === 'INSERT') {
-            setBookmarks((prev) => {
-              if (prev.find((b) => b.id === payload.new.id)) return prev;
-              return [payload.new as Bookmark, ...prev];
-            });
+            setBookmarksUniq((prev) => [payload.new as Bookmark, ...prev]);
           } else if (payload.eventType === 'DELETE') {
             setBookmarks((prev) => prev.filter((b) => b.id !== payload.old.id));
           } else if (payload.eventType === 'UPDATE') {
@@ -77,31 +90,63 @@ export default function DashboardPage() {
         }
       )
       .subscribe((status, err) => {
-        console.log('Realtime: Subscription status changed:', status);
+        console.log(`Realtime: Subscription status for ${user.id}:`, status);
         if (err) console.error('Realtime: Subscription error:', err);
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime: Channel error occurred.');
+        
+        // If realtime fails, we can implement a periodic fallback refresh
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Realtime: Connection failed. Falling back to periodic refresh.');
         }
       });
 
+    // Fallback Polling (only if needed or as a safety measure)
+    // Refresh every 60 seconds as a final fallback
+    const pollInterval = setInterval(async () => {
+      const { data } = await supabase
+        .from('bookmarks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (data) setBookmarksUniq(data);
+    }, 60000);
+
     return () => {
-      console.log('Realtime: Cleaning up subscription');
+      console.log('Realtime: Cleaning up');
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [user, supabase]);
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteRequest = (bookmark: Bookmark) => {
+    setBookmarkToDelete(bookmark);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!bookmarkToDelete) return;
+    
+    const id = bookmarkToDelete.id;
     // Optimistic UI updates
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
+    setIsDeleteModalOpen(false);
+    
     const { error } = await supabase.from('bookmarks').delete().eq('id', id);
     if (!error) {
       setToast({ message: 'Bookmark deleted successfully', type: 'success' });
     } else {
+      // Revert on error
+      const { data } = await supabase
+        .from('bookmarks')
+        .select('*')
+        .eq('user_id', user!.id)
+        .order('created_at', { ascending: false });
+      if (data) setBookmarks(data);
       setToast({ message: 'Failed to delete bookmark', type: 'error' });
     }
   };
 
-  const handleAddSuccess = () => {
+  const handleAddSuccess = (newBookmark: Bookmark) => {
+    setBookmarksUniq((prev) => [newBookmark, ...prev]);
     setToast({ message: 'Bookmark added successfully!', type: 'success' });
   };
 
@@ -183,7 +228,7 @@ export default function DashboardPage() {
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredBookmarks.map((bookmark) => (
-                <BookmarkCard key={bookmark.id} bookmark={bookmark} onDelete={handleDelete} />
+                <BookmarkCard key={bookmark.id} bookmark={bookmark} onDelete={handleDeleteRequest} />
               ))}
             </div>
           )}
@@ -196,6 +241,15 @@ export default function DashboardPage() {
           onClose={() => setIsModalOpen(false)}
           onSuccess={handleAddSuccess}
           userId={user.id}
+        />
+      )}
+
+      {bookmarkToDelete && (
+        <DeleteConfirmationModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={confirmDelete}
+          title={bookmarkToDelete.title}
         />
       )}
 

@@ -8,10 +8,9 @@ export function BookmarkCard({
   onDelete,
 }: {
   bookmark: Bookmark;
-  onDelete: (id: string) => void;
+  onDelete: (bookmark: Bookmark) => void;
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getFaviconUrl = (url: string) => {
     try {
@@ -20,11 +19,6 @@ export function BookmarkCard({
     } catch {
       return '';
     }
-  };
-
-  const handleDelete = () => {
-    setIsDeleting(true);
-    onDelete(bookmark.id);
   };
 
   return (
@@ -57,7 +51,7 @@ export function BookmarkCard({
           </div>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => onDelete(bookmark)}
           disabled={isDeleting}
           className="flex-shrink-0 rounded-lg p-2 text-slate-300 hover:bg-red-50 hover:text-red-600 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 active:scale-90"
           aria-label="Delete bookmark"
@@ -65,13 +59,6 @@ export function BookmarkCard({
           <Trash2 className="h-5 w-5" />
         </button>
       </div>
-
-      <DeleteConfirmationModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onConfirm={handleDelete}
-        title={bookmark.title}
-      />
     </div>
   );
 }

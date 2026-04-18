@@ -47,7 +47,20 @@ The app uses **Supabase Realtime** (`postgres_changes`) to keep the UI perfectly
 
 ### 4. CSS @theme Warnings
 - **Problem:** Lint warnings about the `@theme` rule in `globals.css`.
-- **Solution:** Confirmed this is a standard Tailwind 4 feature and doesn't affect the build. Suppressed or ignored the lint warning as the functionality is correct.
+- **Solution:** Confirmed this is a standard Tailwind 4 feature and doesn't affect the build.
+
+### 5. Duplicate Delete Confirmation Popups
+- **Problem:** Clicking delete showed two or more confirmation popups.
+- **Cause:** `DeleteConfirmationModal` was rendered inside each `BookmarkCard`, leading to multiple instances in the DOM.
+- **Solution:** Refactored the dashboard to use a **Singleton Modal Pattern**. A single modal is now shared across the dashboard, and cards simply "request" deletion from the parent.
+
+### 6. Realtime Status: CHANNEL_ERROR & SYNC Delay
+- **Problem:** Dashboard didn't update instantly on addition, and console showed `CHANNEL_ERROR`.
+- **Cause:** Restricted networks often block WebSockets (`wss://`), and relying purely on real-time events caused delays or failures.
+- **Solution:** Implemented **Hybrid Synchronization**:
+    - **Optimistic/Manual Updates:** UI updates immediately on success before the server responds.
+    - **Unique Channel Naming:** Used per-user channel IDs to avoid subscription conflicts.
+    - **Polling Fallback:** Added a 60-second recovery poll to keep the UI in sync even if Real-time is blocked.
 
 ## 🎁 Bonus Features
 
